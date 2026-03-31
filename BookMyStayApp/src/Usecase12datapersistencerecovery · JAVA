@@ -1,0 +1,272 @@
+import java.io.*;
+import java.util.*;
+ 
+// ==========================================================
+// CLASS – PersistenceService
+// ==========================================================
+// Handles serialization (save) and deserialization (load)
+// of booking history and inventory state to/from a flat file.
+// Uses a simple line-based text format for clarity.
+ 
+class PersistenceService {
+ 
+    // File paths for persisted data
+    private static final String BOOKINGS_FILE  = "bookings.txt";
+    private static final String INVENTORY_FILE = "inventory.txt";
+ 
+    // ----------------------------------------------------------
+    // SAVE: Serialize booking history to file
+    // ----------------------------------------------------------
+    public void saveBookings(BookingHistory history) {
+ 
+        try (BufferedWriter writer =
+                new BufferedWriter(new FileWriter(BOOKINGS_FILE))) {
+ 
+            for (Reservation r : history.getAllReservations()) {
+                // Format: reservationId|guestName|roomType
+                writer.write(r.getReservationId() + "|" +
+                             r.getGuestName()      + "|" +
+                             r.getRoomType());
+                writer.newLine();
+            }
+ 
+            System.out.println("Bookings saved to '" + BOOKINGS_FILE + "'.");
+ 
+        } catch (IOException e) {
+            System.out.println("Save Failed (bookings): " + e.getMessage());
+        }
+    }
+ 
+    // ----------------------------------------------------------
+    // LOAD: Deserialize booking history from file
+    // ----------------------------------------------------------
+    public BookingHistory loadBookings() {
+ 
+        BookingHistory history = new BookingHistory();
+ 
+        File file = new File(BOOKINGS_FILE);
+ 
+        if (!file.exists()) {
+            System.out.println("No booking file found. Starting fresh.");
+            return history;
+        }
+ 
+        try (BufferedReader reader =
+                new BufferedReader(new FileReader(BOOKINGS_FILE))) {
+ 
+            String line;
+ 
+            while ((line = reader.readLine()) != null) {
+ 
+                line = line.trim();
+ 
+                if (line.isEmpty()) continue;
+ 
+                String[] parts = line.split("\\|");
+ 
+                if (parts.length == 3) {
+                    Reservation r = new Reservation(
+                        parts[0], parts[1], parts[2]
+                    );
+                    history.addReservation(r);
+                }
+            }
+ 
+            System.out.println("Bookings restored from '" + BOOKINGS_FILE + "'.");
+ 
+        } catch (IOException e) {
+            System.out.println("Load Failed (bookings): " + e.getMessage());
+        }
+ 
+        return history;
+    }
+ 
+    // ----------------------------------------------------------
+    // SAVE: Serialize inventory snapshot to file
+    // ----------------------------------------------------------
+    public void saveInventory(Map<String, Integer> inventoryMap) {
+ 
+        try (BufferedWriter writer =
+                new BufferedWriter(new FileWriter(INVENTORY_FILE))) {
+ 
+            for (Map.Entry<String, Integer> entry : inventoryMap.entrySet()) {
+                // Format: roomType|count
+                writer.write(entry.getKey() + "|" + entry.getValue());
+                writer.newLine();
+            }
+ 
+            System.out.println("Inventory saved to '" + INVENTORY_FILE + "'.");
+ 
+        } catch (IOException e) {
+            System.out.println("Save Failed (inventory): " + e.getMessage());
+        }
+    }
+ 
+    // ----------------------------------------------------------
+    // LOAD: Deserialize inventory snapshot from file
+    // ----------------------------------------------------------
+    public Map<String, Integer> loadInventory() {
+ 
+        Map<String, Integer> inventoryMap = new HashMap<>();
+ 
+        File file = new File(INVENTORY_FILE);
+ 
+        if (!file.exists()) {
+            System.out.println("No inventory file found. Using defaults.");
+            inventoryMap.put("Single", 3);
+            inventoryMap.put("Double", 2);
+            inventoryMap.put("Suite",  1);
+            return inventoryMap;
+        }
+ 
+        try (BufferedReader reader =
+                new BufferedReader(new FileReader(INVENTORY_FILE))) {
+ 
+            String line;
+ 
+            while ((line = reader.readLine()) != null) {
+ 
+                line = line.trim();
+ 
+                if (line.isEmpty()) continue;
+ 
+                String[] parts = line.split("\\|");
+ 
+                if (parts.length == 2) {
+                    try {
+                        inventoryMap.put(parts[0],
+                                         Integer.parseInt(parts[1]));
+                    } catch (NumberFormatException e) {
+                        System.out.println("Skipping corrupt inventory line: "
+                                           + line);
+                    }
+                }
+            }
+ 
+            System.out.println("Inventory restored from '" + INVENTORY_FILE + "'.");
+ 
+        } catch (IOException e) {
+            System.out.println("Load Failed (inventory): " + e.getMessage());
+        }
+ 
+        return inventoryMap;
+    }
+}
+ 
+// ==========================================================
+// MAIN CLASS – UseCase12DataPersistenceRecovery
+// ==========================================================
+// Demonstrates save-before-shutdown and restore-on-startup
+// to ensure system state survives application restarts.
+ 
+public class UseCase12DataPersistenceRecovery {
+ 
+    public static void main(String[] args) {
+ 
+        System.out.println("=== Use Case 12: Data Persistence & System Recovery ===\n");
+ 
+        PersistenceService persistence = new PersistenceService();
+ 
+        // =======================================================
+        // PHASE 1 – System Session: Simulate active bookings
+        // =======================================================
+        System.out.println("============================");
+        System.out.println(" PHASE 1: Active Session    ");
+        System.out.println("============================\n");
+ 
+        // Initialize inventory
+        RoomInventory inventory = new RoomInventory();
+        BookingHistory history  = new BookingHistory();
+ 
+        // Simulate confirmed bookings
+        Reservation r1 = new Reservation("Single-1", "Abhi",     "Single");
+        Reservation r2 = new Reservation("Single-2", "Suba",     "Single");
+        Reservation r3 = new Reservation("Suite-1",  "Vanmathi", "Suite");
+ 
+        history.addReservation(r1);
+        history.addReservation(r2);
+        history.addReservation(r3);
+ 
+        inventory.decrement("Single");
+        inventory.decrement("Single");
+        inventory.decrement("Suite");
+ 
+        System.out.println("Active Booking History:");
+        for (Reservation r : history.getAllReservations()) {
+            System.out.println("  " + r);
+        }
+ 
+        System.out.println("\nInventory Before Save:");
+        inventory.printInventory();
+ 
+        // -------------------------------------------------------
+        // System preparing for shutdown – persist state
+        // -------------------------------------------------------
+        System.out.println("\n--- System Shutdown: Saving State ---");
+        persistence.saveBookings(history);
+        persistence.saveInventory(inventory.getRoomAvailability());
+ 
+        // =======================================================
+        // PHASE 2 – System Restart: Recover from persisted data
+        // =======================================================
+        System.out.println("\n============================");
+        System.out.println(" PHASE 2: System Restart    ");
+        System.out.println("============================\n");
+ 
+        System.out.println("--- Restoring System State ---");
+ 
+        // Restore booking history
+        BookingHistory recoveredHistory = persistence.loadBookings();
+ 
+        // Restore inventory
+        Map<String, Integer> recoveredMap = persistence.loadInventory();
+ 
+        // -------------------------------------------------------
+        // Display recovered state
+        // -------------------------------------------------------
+        System.out.println("\nRecovered Booking History:");
+        List<Reservation> recovered = recoveredHistory.getAllReservations();
+ 
+        if (recovered.isEmpty()) {
+            System.out.println("  (no bookings recovered)");
+        } else {
+            for (Reservation r : recovered) {
+                System.out.println("  " + r);
+            }
+        }
+ 
+        System.out.println("\nRecovered Inventory:");
+        for (Map.Entry<String, Integer> entry : recoveredMap.entrySet()) {
+            System.out.println("  " + entry.getKey() +
+                               ": " + entry.getValue() + " available");
+        }
+ 
+        // =======================================================
+        // PHASE 3 – Resilience: Handle missing file gracefully
+        // =======================================================
+        System.out.println("\n============================");
+        System.out.println(" PHASE 3: Resilience Check  ");
+        System.out.println("============================\n");
+ 
+        // Delete files to simulate missing/corrupted persistence
+        new File("bookings.txt").delete();
+        new File("inventory.txt").delete();
+ 
+        System.out.println("--- Persistence files deleted. Simulating fresh start. ---\n");
+ 
+        BookingHistory    freshHistory    = persistence.loadBookings();
+        Map<String, Integer> freshInventory = persistence.loadInventory();
+ 
+        System.out.println("\nFresh Booking History: " +
+            (freshHistory.getAllReservations().isEmpty()
+             ? "Empty (as expected)" : "Unexpected data"));
+ 
+        System.out.println("Fresh Inventory (defaults):");
+        for (Map.Entry<String, Integer> entry : freshInventory.entrySet()) {
+            System.out.println("  " + entry.getKey() +
+                               ": " + entry.getValue() + " available");
+        }
+ 
+        System.out.println("\n=== Persistence & Recovery Complete. System ran safely. ===");
+    }
+}
