@@ -1,0 +1,199 @@
+import java.util.*;
+ 
+// ==========================================================
+// CUSTOM EXCEPTION – InvalidRoomTypeException
+// ==========================================================
+// Thrown when an unrecognized room type is provided.
+// Domain-specific exceptions make the error cause explicit.
+ 
+class InvalidRoomTypeException extends Exception {
+ 
+    public InvalidRoomTypeException(String message) {
+        super(message);
+    }
+}
+ 
+// ==========================================================
+// CUSTOM EXCEPTION – InvalidGuestNameException
+// ==========================================================
+// Thrown when a guest name is null or blank.
+ 
+class InvalidGuestNameException extends Exception {
+ 
+    public InvalidGuestNameException(String message) {
+        super(message);
+    }
+}
+ 
+// ==========================================================
+// CUSTOM EXCEPTION – InventoryUnderflowException
+// ==========================================================
+// Thrown when a decrement would make inventory negative.
+ 
+class InventoryUnderflowException extends Exception {
+ 
+    public InventoryUnderflowException(String message) {
+        super(message);
+    }
+}
+ 
+// ==========================================================
+// CLASS – InvalidBookingValidator
+// ==========================================================
+// Validates input data and system state before any booking
+// operation is performed. Implements Fail-Fast design.
+ 
+class InvalidBookingValidator {
+ 
+    // Valid room types accepted by the system
+    private static final Set<String> VALID_ROOM_TYPES =
+        new HashSet<>(Arrays.asList("Single", "Double", "Suite"));
+ 
+    // Validate guest name – must not be null or blank
+    public void validateGuestName(String guestName)
+            throws InvalidGuestNameException {
+ 
+        if (guestName == null || guestName.trim().isEmpty()) {
+            throw new InvalidGuestNameException(
+                "Validation Failed: Guest name must not be null or empty."
+            );
+        }
+    }
+ 
+    // Validate room type – must be one of the accepted types
+    public void validateRoomType(String roomType)
+            throws InvalidRoomTypeException {
+ 
+        if (roomType == null || !VALID_ROOM_TYPES.contains(roomType)) {
+            throw new InvalidRoomTypeException(
+                "Validation Failed: '" + roomType +
+                "' is not a valid room type. Accepted: Single, Double, Suite."
+            );
+        }
+    }
+ 
+    // Guard inventory – prevent decrement below zero
+    public void validateInventoryBeforeDecrement(
+            String roomType, int currentCount)
+            throws InventoryUnderflowException {
+ 
+        if (currentCount <= 0) {
+            throw new InventoryUnderflowException(
+                "Validation Failed: No '" + roomType +
+                "' rooms available. Inventory cannot go below zero."
+            );
+        }
+    }
+}
+ 
+// ==========================================================
+// MAIN CLASS – UseCase9ErrorHandlingValidation
+// ==========================================================
+// Demonstrates structured validation and custom exception
+// handling to strengthen system reliability.
+ 
+public class UseCase9ErrorHandlingValidation {
+ 
+    public static void main(String[] args) {
+ 
+        System.out.println("=== Use Case 9: Error Handling & Validation ===\n");
+ 
+        InvalidBookingValidator validator = new InvalidBookingValidator();
+ 
+        // -------------------------------------------------------
+        // Scenario 1: Valid booking – passes all validations
+        // -------------------------------------------------------
+        System.out.println("--- Scenario 1: Valid Booking ---");
+        try {
+            String guestName = "Abhi";
+            String roomType  = "Single";
+            int    available = 2;
+ 
+            validator.validateGuestName(guestName);
+            validator.validateRoomType(roomType);
+            validator.validateInventoryBeforeDecrement(roomType, available);
+ 
+            System.out.println("Validation Passed.");
+            System.out.println("Booking accepted for Guest: " + guestName +
+                               ", Room Type: " + roomType);
+ 
+        } catch (InvalidGuestNameException |
+                 InvalidRoomTypeException  |
+                 InventoryUnderflowException e) {
+            System.out.println(e.getMessage());
+        }
+ 
+        System.out.println();
+ 
+        // -------------------------------------------------------
+        // Scenario 2: Blank guest name – triggers validation error
+        // -------------------------------------------------------
+        System.out.println("--- Scenario 2: Blank Guest Name ---");
+        try {
+            String guestName = "   ";
+            String roomType  = "Double";
+ 
+            validator.validateGuestName(guestName);
+            validator.validateRoomType(roomType);
+ 
+            System.out.println("Booking accepted for Guest: " + guestName);
+ 
+        } catch (InvalidGuestNameException e) {
+            System.out.println(e.getMessage());
+            System.out.println("System remains stable. Booking rejected.");
+        } catch (InvalidRoomTypeException e) {
+            System.out.println(e.getMessage());
+        }
+ 
+        System.out.println();
+ 
+        // -------------------------------------------------------
+        // Scenario 3: Invalid room type – triggers validation error
+        // -------------------------------------------------------
+        System.out.println("--- Scenario 3: Invalid Room Type ---");
+        try {
+            String guestName = "Suba";
+            String roomType  = "Penthouse"; // Not a valid type
+ 
+            validator.validateGuestName(guestName);
+            validator.validateRoomType(roomType);
+ 
+            System.out.println("Booking accepted for Guest: " + guestName);
+ 
+        } catch (InvalidGuestNameException e) {
+            System.out.println(e.getMessage());
+        } catch (InvalidRoomTypeException e) {
+            System.out.println(e.getMessage());
+            System.out.println("System remains stable. Booking rejected.");
+        }
+ 
+        System.out.println();
+ 
+        // -------------------------------------------------------
+        // Scenario 4: Zero inventory – prevents underflow
+        // -------------------------------------------------------
+        System.out.println("--- Scenario 4: Inventory Exhausted ---");
+        try {
+            String guestName  = "Vanmathi";
+            String roomType   = "Suite";
+            int    available  = 0; // Suite is fully booked
+ 
+            validator.validateGuestName(guestName);
+            validator.validateRoomType(roomType);
+            validator.validateInventoryBeforeDecrement(roomType, available);
+ 
+            System.out.println("Booking accepted for Guest: " + guestName);
+ 
+        } catch (InvalidGuestNameException e) {
+            System.out.println(e.getMessage());
+        } catch (InvalidRoomTypeException e) {
+            System.out.println(e.getMessage());
+        } catch (InventoryUnderflowException e) {
+            System.out.println(e.getMessage());
+            System.out.println("System remains stable. Inventory protected.");
+        }
+ 
+        System.out.println();
+        System.out.println("=== Validation Complete. System ran safely. ===");
+    }
+}
