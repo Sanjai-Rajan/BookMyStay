@@ -52,3 +52,4 @@ public class UseCase2RoomInitialization {
         System.out.println("Available: " + suiteAvailable);
     }
 }
+ 
