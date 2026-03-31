@@ -1,0 +1,197 @@
+import java.util.*;
+import java.util.concurrent.*;
+ 
+// ==========================================================
+// CLASS – ThreadSafeInventory
+// ==========================================================
+// A thread-safe version of RoomInventory.
+// Uses synchronized methods to protect shared mutable state
+// and prevent double allocation under concurrent access.
+ 
+class ThreadSafeInventory {
+ 
+    // Shared inventory map – accessed by multiple threads
+    private final Map<String, Integer> rooms;
+ 
+    public ThreadSafeInventory() {
+        rooms = new HashMap<>();
+        rooms.put("Single", 3);
+        rooms.put("Double", 2);
+        rooms.put("Suite",  1);
+    }
+ 
+    // Synchronized: only one thread may check and decrement at a time
+    public synchronized boolean tryAllocate(String roomType) {
+ 
+        int count = rooms.getOrDefault(roomType, 0);
+ 
+        if (count > 0) {
+            rooms.put(roomType, count - 1);
+            return true; // Allocation succeeded
+        }
+ 
+        return false; // No rooms available
+    }
+ 
+    // Synchronized read of current availability
+    public synchronized int getAvailable(String roomType) {
+        return rooms.getOrDefault(roomType, 0);
+    }
+ 
+    // Print all availability – synchronized for consistent snapshot
+    public synchronized void printInventory() {
+        for (Map.Entry<String, Integer> entry : rooms.entrySet()) {
+            System.out.println("  " + entry.getKey() +
+                               ": " + entry.getValue() + " available");
+        }
+    }
+}
+ 
+// ==========================================================
+// CLASS – ConcurrentBookingProcessor
+// ==========================================================
+// Implements Runnable to simulate a guest booking thread.
+// Shared inventory and result log are accessed concurrently.
+ 
+class ConcurrentBookingProcessor implements Runnable {
+ 
+    private final String               guestName;
+    private final String               roomType;
+    private final ThreadSafeInventory  inventory;
+    private final List<String>         resultLog;  // Shared result collector
+ 
+    public ConcurrentBookingProcessor(String guestName,
+                                       String roomType,
+                                       ThreadSafeInventory inventory,
+                                       List<String> resultLog) {
+        this.guestName  = guestName;
+        this.roomType   = roomType;
+        this.inventory  = inventory;
+        this.resultLog  = resultLog;
+    }
+ 
+    @Override
+    public void run() {
+ 
+        // Critical section – tryAllocate is synchronized inside
+        boolean allocated = inventory.tryAllocate(roomType);
+ 
+        String result;
+ 
+        if (allocated) {
+            result = "SUCCESS | Guest: " + guestName +
+                     " | Room Type: " + roomType +
+                     " | Thread: " + Thread.currentThread().getName();
+        } else {
+            result = "FAILED  | Guest: " + guestName +
+                     " | Room Type: " + roomType +
+                     " (No rooms available)" +
+                     " | Thread: " + Thread.currentThread().getName();
+        }
+ 
+        // Synchronize result log writes to prevent interleaving
+        synchronized (resultLog) {
+            resultLog.add(result);
+        }
+    }
+}
+ 
+// ==========================================================
+// MAIN CLASS – UseCase11ConcurrentBookingSimulation
+// ==========================================================
+// Simulates multiple guests booking simultaneously.
+// Demonstrates that synchronization prevents double allocation
+// and race conditions under concurrent load.
+ 
+public class UseCase11ConcurrentBookingSimulation {
+ 
+    public static void main(String[] args) throws InterruptedException {
+ 
+        System.out.println("=== Use Case 11: Concurrent Booking Simulation ===\n");
+ 
+        // Shared inventory (only 3 Single, 2 Double, 1 Suite)
+        ThreadSafeInventory inventory = new ThreadSafeInventory();
+ 
+        System.out.println("--- Initial Inventory ---");
+        inventory.printInventory();
+        System.out.println();
+ 
+        // Shared result log – collects outcomes from all threads
+        List<String> resultLog = new ArrayList<>();
+ 
+        // -------------------------------------------------------
+        // Define concurrent booking requests (more than available)
+        // This deliberately creates contention to show thread safety
+        // -------------------------------------------------------
+        String[][] bookingRequests = {
+            {"Abhi",     "Single"},
+            {"Suba",     "Single"},
+            {"Vanmathi", "Single"},
+            {"Karthik",  "Single"},  // 4th Single – should FAIL
+            {"Priya",    "Double"},
+            {"Rahul",    "Double"},
+            {"Deepa",    "Double"},  // 3rd Double – should FAIL
+            {"Arjun",    "Suite"},
+            {"Meena",    "Suite"},   // 2nd Suite – should FAIL
+        };
+ 
+        // -------------------------------------------------------
+        // Create and start all threads simultaneously
+        // -------------------------------------------------------
+        System.out.println("--- Submitting " + bookingRequests.length +
+                           " Concurrent Booking Requests ---\n");
+ 
+        List<Thread> threads = new ArrayList<>();
+ 
+        for (String[] request : bookingRequests) {
+ 
+            Thread t = new Thread(
+                new ConcurrentBookingProcessor(
+                    request[0], request[1], inventory, resultLog
+                )
+            );
+ 
+            threads.add(t);
+        }
+ 
+        // Start all threads as close together as possible
+        for (Thread t : threads) {
+            t.start();
+        }
+ 
+        // Wait for all threads to complete
+        for (Thread t : threads) {
+            t.join();
+        }
+ 
+        // -------------------------------------------------------
+        // Print all booking results
+        // -------------------------------------------------------
+        System.out.println("--- Booking Results ---\n");
+        for (String result : resultLog) {
+            System.out.println(result);
+        }
+ 
+        // -------------------------------------------------------
+        // Print final inventory – confirms no over-allocation
+        // -------------------------------------------------------
+        System.out.println("\n--- Final Inventory After Concurrent Bookings ---");
+        inventory.printInventory();
+ 
+        // -------------------------------------------------------
+        // Summary
+        // -------------------------------------------------------
+        long succeeded = resultLog.stream()
+                                  .filter(r -> r.startsWith("SUCCESS"))
+                                  .count();
+        long failed    = resultLog.stream()
+                                  .filter(r -> r.startsWith("FAILED"))
+                                  .count();
+ 
+        System.out.println("\n--- Summary ---");
+        System.out.println("Total Requests : " + bookingRequests.length);
+        System.out.println("Succeeded      : " + succeeded);
+        System.out.println("Failed         : " + failed);
+        System.out.println("\n=== Concurrent Simulation Complete. No double allocation occurred. ===");
+    }
+}
