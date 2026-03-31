@@ -8,7 +8,7 @@ public class BookingHistory {
     public BookingHistory() {
         confirmedBookings = new ArrayList<>();
     }
-
+ 
     // Add confirmed reservation
     public void addReservation(Reservation reservation) {
         confirmedBookings.add(reservation);
