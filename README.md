@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+# BookMyStayApp
+>>>>>>> e8f0d5feeab5792f7a9f1598191081da6789fc49
 # BookMyStayApp 
 **Book My Stay** is a simple, structured Java-based Hotel Booking Management System designed to demonstrate core Object-Oriented Programming (OOP) concepts step-by-step through distinct use cases.
 
@@ -75,4 +79,7 @@ java UseCase4RoomSearch
 
 ##  Contributing
 Contributions, issues, and feature requests are welcome! Feel free to modify the system to add features like *Customer Booking*, *Payment Processing*, or *Date Tracking!*
+<<<<<<< HEAD
 
+=======
+>>>>>>> e8f0d5feeab5792f7a9f1598191081da6789fc49
