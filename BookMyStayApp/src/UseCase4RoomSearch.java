@@ -7,7 +7,7 @@
  *
  * Demonstrates safe read-only access
  * to room availability through a search service.
- *
+ *b
  * Inventory state is not modified.
  *
  * @version 4.1
