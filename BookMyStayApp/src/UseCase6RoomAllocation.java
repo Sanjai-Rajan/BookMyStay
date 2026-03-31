@@ -11,7 +11,7 @@ public class UseCase6RoomAllocation {
         bookingQueue.add(new Reservation("Suba", "Single"));
         bookingQueue.add(new Reservation("Vannathi", "Suite"));
 
-        RoomInventory inventory = new RoomInventory();
+        RoomInventory inventory = new RoomInventory(); 
         RoomAllocationService allocator = new RoomAllocationService();
 
         System.out.println("Room Allocation Processing:\n");
