@@ -16,7 +16,7 @@ import java.util.Map;
  *
  * No booking or search logic is introduced here.
  *
- * @version 3.1
+ * @version 3.1 
  */
 
 public class UseCase3InventorySetup {
