@@ -1,0 +1,190 @@
+import java.util.*;
+ 
+// ==========================================================
+// CLASS – CancellationService
+// ==========================================================
+// Handles cancellation of confirmed bookings.
+// Uses a Stack to track released room IDs (LIFO rollback).
+// Restores inventory count immediately after cancellation.
+ 
+class CancellationService {
+ 
+    // Stack tracks recently released room IDs (LIFO order)
+    private Stack<String> releasedRoomIds;
+ 
+    // Stores confirmed reservations by reservation ID
+    private Map<String, Reservation> confirmedReservations;
+ 
+    // Tracks which room ID was assigned to each reservation
+    private Map<String, String> reservationToRoomId;
+ 
+    // Constructor
+    public CancellationService() {
+        releasedRoomIds         = new Stack<>();
+        confirmedReservations   = new HashMap<>();
+        reservationToRoomId     = new HashMap<>();
+    }
+ 
+    // Register a confirmed reservation for potential cancellation
+    public void registerConfirmedBooking(Reservation reservation,
+                                         String assignedRoomId) {
+ 
+        confirmedReservations.put(reservation.getReservationId(), reservation);
+        reservationToRoomId.put(reservation.getReservationId(), assignedRoomId);
+ 
+        System.out.println("Registered: " + reservation.getReservationId() +
+                           " -> Room " + assignedRoomId);
+    }
+ 
+    // Cancel a reservation and roll back inventory
+    public boolean cancelReservation(String reservationId,
+                                      RoomInventory inventory,
+                                      BookingHistory history) {
+ 
+        // Validate: reservation must exist
+        if (!confirmedReservations.containsKey(reservationId)) {
+            System.out.println("Cancellation Failed: Reservation '" +
+                               reservationId + "' not found.");
+            return false;
+        }
+ 
+        Reservation reservation = confirmedReservations.get(reservationId);
+        String      roomId      = reservationToRoomId.get(reservationId);
+        String      roomType    = reservation.getRoomType();
+ 
+        // Step 1 – Push released room ID onto rollback stack
+        releasedRoomIds.push(roomId);
+ 
+        // Step 2 – Restore inventory count
+        inventory.increment(roomType);
+ 
+        // Step 3 – Remove from confirmed records
+        confirmedReservations.remove(reservationId);
+        reservationToRoomId.remove(reservationId);
+ 
+        // Step 4 – Remove from booking history
+        history.removeReservation(reservationId);
+ 
+        System.out.println("Cancellation Successful:");
+        System.out.println("  Reservation ID : " + reservationId);
+        System.out.println("  Guest          : " + reservation.getGuestName());
+        System.out.println("  Released Room  : " + roomId);
+        System.out.println("  Inventory for '" + roomType + "' restored.");
+ 
+        return true;
+    }
+ 
+    // Show the LIFO order of released room IDs
+    public void printRollbackStack() {
+ 
+        System.out.println("\nRollback Stack (LIFO - most recent on top):");
+ 
+        if (releasedRoomIds.isEmpty()) {
+            System.out.println("  (empty)");
+            return;
+        }
+ 
+        Stack<String> copy = new Stack<>();
+        copy.addAll(releasedRoomIds);
+ 
+        while (!copy.isEmpty()) {
+            System.out.println("  Released Room ID: " + copy.pop());
+        }
+    }
+}
+ 
+// ==========================================================
+// MAIN CLASS – UseCase10BookingCancellation
+// ==========================================================
+// Demonstrates safe cancellation with controlled rollback
+// and accurate inventory restoration using a Stack.
+ 
+public class UseCase10BookingCancellation {
+ 
+    public static void main(String[] args) {
+ 
+        System.out.println("=== Use Case 10: Booking Cancellation & Inventory Rollback ===\n");
+ 
+        // Setup inventory and booking history
+        RoomInventory  inventory         = new RoomInventory();
+        BookingHistory history           = new BookingHistory();
+        CancellationService cancellation = new CancellationService();
+ 
+        // -------------------------------------------------------
+        // Step 1 – Simulate confirmed bookings (from Use Case 6)
+        // -------------------------------------------------------
+        System.out.println("--- Confirmed Bookings ---");
+ 
+        Reservation r1 = new Reservation("Single-1", "Abhi",     "Single");
+        Reservation r2 = new Reservation("Single-2", "Suba",     "Single");
+        Reservation r3 = new Reservation("Suite-1",  "Vanmathi", "Suite");
+ 
+        // Register bookings and decrement inventory
+        cancellation.registerConfirmedBooking(r1, "Single-1");
+        inventory.decrement("Single");
+        history.addReservation(r1);
+ 
+        cancellation.registerConfirmedBooking(r2, "Single-2");
+        inventory.decrement("Single");
+        history.addReservation(r2);
+ 
+        cancellation.registerConfirmedBooking(r3, "Suite-1");
+        inventory.decrement("Suite");
+        history.addReservation(r3);
+ 
+        // -------------------------------------------------------
+        // Step 2 – Show inventory before cancellation
+        // -------------------------------------------------------
+        System.out.println("\n--- Inventory Before Cancellation ---");
+        inventory.printInventory();
+ 
+        System.out.println("\n--- Booking History Before Cancellation ---");
+        for (Reservation r : history.getAllReservations()) {
+            System.out.println("  " + r);
+        }
+ 
+        // -------------------------------------------------------
+        // Step 3 – Cancel a valid reservation
+        // -------------------------------------------------------
+        System.out.println("\n--- Cancelling Reservation: Single-2 ---");
+        cancellation.cancelReservation("Single-2", inventory, history);
+ 
+        // -------------------------------------------------------
+        // Step 4 – Cancel another valid reservation
+        // -------------------------------------------------------
+        System.out.println("\n--- Cancelling Reservation: Suite-1 ---");
+        cancellation.cancelReservation("Suite-1", inventory, history);
+ 
+        // -------------------------------------------------------
+        // Step 5 – Attempt duplicate cancellation (already cancelled)
+        // -------------------------------------------------------
+        System.out.println("\n--- Attempting Duplicate Cancellation: Suite-1 ---");
+        cancellation.cancelReservation("Suite-1", inventory, history);
+ 
+        // -------------------------------------------------------
+        // Step 6 – Show inventory after rollback
+        // -------------------------------------------------------
+        System.out.println("\n--- Inventory After Cancellations ---");
+        inventory.printInventory();
+ 
+        // -------------------------------------------------------
+        // Step 7 – Show remaining booking history
+        // -------------------------------------------------------
+        System.out.println("\n--- Booking History After Cancellations ---");
+        List<Reservation> remaining = history.getAllReservations();
+        if (remaining.isEmpty()) {
+            System.out.println("  No active bookings.");
+        } else {
+            for (Reservation r : remaining) {
+                System.out.println("  " + r);
+            }
+        }
+ 
+        // -------------------------------------------------------
+        // Step 8 – Show LIFO rollback stack
+        // -------------------------------------------------------
+        cancellation.printRollbackStack();
+ 
+        System.out.println("\n=== Cancellation & Rollback Complete ===");
+    }
+}
