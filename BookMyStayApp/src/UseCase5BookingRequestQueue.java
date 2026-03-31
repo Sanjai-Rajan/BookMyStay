@@ -13,7 +13,7 @@ public class UseCase5BookingRequestQueue {
         bookingQueue.addRequest(r1);
         bookingQueue.addRequest(r2);
         bookingQueue.addRequest(r3);
-
+ 
         while (bookingQueue.hasPendingRequests()) {
             Reservation current = bookingQueue.getNextRequest();
             System.out.println(
